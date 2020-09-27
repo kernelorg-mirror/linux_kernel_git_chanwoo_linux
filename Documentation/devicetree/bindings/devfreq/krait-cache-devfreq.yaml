@@ -1,0 +1,77 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: https://protect2.fireeye.com/v1/url?k=48a05c33-15730727-48a1d77c-0cc47a31ce4e-4d5a597f4df53c48&q=1&e=6ba5f644-3667-4d4d-b335-085ba80b998e&u=http%3A%2F%2Fdevicetree.org%2Fschemas%2Fcpufreq%2Fkrait-cache-devfreq.yaml%23
+$schema: https://protect2.fireeye.com/v1/url?k=aa78a2ed-f7abf9f9-aa7929a2-0cc47a31ce4e-7855f9dc7966e26a&q=1&e=6ba5f644-3667-4d4d-b335-085ba80b998e&u=http%3A%2F%2Fdevicetree.org%2Fmeta-schemas%2Fcore.yaml%23
+
+title: DEVFREQ driver for Krait L2 Cpu Cache Frequency Scaling
+
+maintainers:
+  - Ansuel Smith <ansuelsmth@gmail.com>
+
+description: |
+  This Scale the Krait CPU L2 Cache Frequency and optionally voltage
+  when the Cpu Frequency is changed (using the cpufreq notifier).
+
+  Cache is scaled with the max frequency across all core and the cache
+  frequency will scale based on the configured threshold in the dts.
+
+  The cache thresholds can be set to 3+ frequency bin, idle, nominal and
+  high.
+
+properties:
+  compatible:
+    const: qcom,krait-cache
+
+  clocks:
+    $ref: "/schemas/types.yaml#/definitions/phandle"
+    description: Phandle to the L2 CPU clock
+
+  clock-names:
+    const: "l2"
+
+  voltage-tolerance:
+    description: Same voltage tolerance of the Krait CPU
+
+  l2-cpufreq:
+    description: |
+      Threshold used by the driver to scale the L2 cache.
+      If the max CPU Frequency is more than the set frequency,
+      the driver will transition to the next frequency bin.
+      Value is in kHz
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    minItems: 3
+    items:
+      - description: idle
+      - description: nominal
+      - description: high
+
+  l2-supply:
+    $ref: "/schemas/types.yaml#/definitions/phandle"
+    description: Phandle to the L2 regulator supply.
+
+  opp-table: true
+
+required:
+  - compatible
+  - clocks
+  - clock-names
+  - voltage-tolerance
+  - l2-cpufreq
+
+examples:
+  - |
+    qcom-krait-cache {
+      compatible = "qcom,krait-cache";
+      clocks = <&kraitcc 4>;
+      clock-names = "l2";
+      l2-cpufreq = <384000 600000 1200000>;
+      l2-supply = <&smb208_s1a>;
+
+      operating-points = <
+        /* kHz    uV */
+        384000  1100000
+        1000000  1100000
+        1200000  1150000
+      >;
+    };
