@@ -133,6 +133,16 @@ config ARM_RK3399_DMC_DEVFREQ
 	  It sets the frequency for the memory controller and reads the usage counts
 	  from hardware.
 
+config ARM_KRAIT_CACHE_DEVFREQ
+	tristate "Scaling support for Krait CPU Cache Devfreq"
+	depends on ARCH_QCOM || COMPILE_TEST
+	help
+	  This adds the DEVFREQ driver for the Krait CPU L2 Cache shared by all cores.
+
+	  The driver register with the cpufreq notifier and find the right frequency
+	  based on the max frequency across all core and the range set in the device
+	  dts. If provided this scale also the regulator attached to the l2 cache.
+
 source "drivers/devfreq/event/Kconfig"
 
 endif # PM_DEVFREQ
