@@ -129,3 +129,34 @@ Description:
 
 		A list of governors that support the node:
 		- simple_ondemand
+
+What:		/sys/class/devfreq/.../up_threshold
+Date:		September 2020
+Contact:	Chanwoo Choi <cw00.choi@samsung.com>
+Description:
+		This ABI shows and stores the up_threshold by users.
+		If the load is over this value, the frequency jumps.
+		and if user stores less than down_differential,
+		the value is replaced with down_differential.
+
+		The default value is 90 and valid value is [0,100].
+		up_threshold > donw_differental must hold.
+
+		A list of governors that support the node:
+		- simple_ondemand
+
+What:		/sys/class/devfreq/.../down_differential
+Date:		September 2020
+Contact:	Chanwoo Choi <cw00.choi@samsung.com>
+Description:
+		This ABI shows and stores the down_differential by users.
+		If the load is under upthreshold - downdifferential,
+		the governor may consider slowing the frequency down
+		and if user stores larget than up_threshold
+		the value is replaced with up_threshold.
+
+		The default value is 5 and valid value is [0,100].
+		downdifferential < upthreshold must hold.
+
+		A list of governors that support the node:
+		- simple_ondemand

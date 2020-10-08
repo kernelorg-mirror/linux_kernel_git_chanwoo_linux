@@ -1442,12 +1442,11 @@ static int ufshcd_devfreq_init(struct ufs_hba *hba)
 	dev_pm_opp_add(hba->dev, clki->min_freq, 0);
 	dev_pm_opp_add(hba->dev, clki->max_freq, 0);
 
-	ufshcd_vops_config_scaling_param(hba, &hba->vps->devfreq_profile,
-					 &hba->vps->ondemand_data);
+	ufshcd_vops_config_scaling_param(hba, &hba->vps->devfreq_profile, NULL);
 	devfreq = devfreq_add_device(hba->dev,
 			&hba->vps->devfreq_profile,
 			DEVFREQ_GOV_SIMPLE_ONDEMAND,
-			&hba->vps->ondemand_data);
+			NULL);
 	if (IS_ERR(devfreq)) {
 		ret = PTR_ERR(devfreq);
 		dev_err(hba->dev, "Unable to register with devfreq %d\n", ret);
@@ -7975,8 +7974,8 @@ static struct ufs_hba_variant_params ufs_hba_vps = {
 	.devfreq_profile.polling_ms	= 100,
 	.devfreq_profile.target		= ufshcd_devfreq_target,
 	.devfreq_profile.get_dev_status	= ufshcd_devfreq_get_dev_status,
-	.ondemand_data.upthreshold	= 70,
-	.ondemand_data.downdifferential	= 5,
+	.devfreq_profile.up_threshold	= 70,
+	.devfreq_profile.down_differential = 5,
 };
 
 static struct scsi_host_template ufshcd_driver_template = {

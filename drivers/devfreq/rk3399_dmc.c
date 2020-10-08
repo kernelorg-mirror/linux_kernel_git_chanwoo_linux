@@ -58,7 +58,6 @@ struct dram_timing {
 struct rk3399_dmcfreq {
 	struct device *dev;
 	struct devfreq *devfreq;
-	struct devfreq_simple_ondemand_data ondemand_data;
 	struct clk *dmc_clk;
 	struct devfreq_event_dev *edev;
 	struct mutex lock;
@@ -431,9 +430,9 @@ no_pmu:
 	}
 
 	of_property_read_u32(np, "upthreshold",
-			     &data->ondemand_data.upthreshold);
+			     &rk3399_devfreq_dmc_profile.up_threshold);
 	of_property_read_u32(np, "downdifferential",
-			     &data->ondemand_data.downdifferential);
+			     &rk3399_devfreq_dmc_profile.down_differential);
 
 	data->rate = clk_get_rate(data->dmc_clk);
 
@@ -452,7 +451,7 @@ no_pmu:
 	data->devfreq = devm_devfreq_add_device(dev,
 					   &rk3399_devfreq_dmc_profile,
 					   DEVFREQ_GOV_SIMPLE_ONDEMAND,
-					   &data->ondemand_data);
+					   NULL);
 	if (IS_ERR(data->devfreq)) {
 		ret = PTR_ERR(data->devfreq);
 		goto err_free_opp;

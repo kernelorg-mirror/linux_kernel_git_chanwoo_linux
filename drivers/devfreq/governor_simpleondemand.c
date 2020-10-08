@@ -12,18 +12,14 @@
 #include <linux/math64.h>
 #include "governor.h"
 
-/* Default constants for DevFreq-Simple-Ondemand (DFSO) */
-#define DFSO_UPTHRESHOLD	(90)
-#define DFSO_DOWNDIFFERENCTIAL	(5)
 static int devfreq_simple_ondemand_func(struct devfreq *df,
 					unsigned long *freq)
 {
 	int err;
 	struct devfreq_dev_status *stat;
 	unsigned long long a, b;
-	unsigned int dfso_upthreshold = DFSO_UPTHRESHOLD;
-	unsigned int dfso_downdifferential = DFSO_DOWNDIFFERENCTIAL;
-	struct devfreq_simple_ondemand_data *data = df->data;
+	unsigned int dfso_upthreshold = DEVFREQ_UP_THRESHOLD;
+	unsigned int dfso_downdifferential = DEVFREQ_DOWN_DIFFERENCTIAL;
 
 	err = devfreq_update_stats(df);
 	if (err)
@@ -31,12 +27,11 @@ static int devfreq_simple_ondemand_func(struct devfreq *df,
 
 	stat = &df->last_status;
 
-	if (data) {
-		if (data->upthreshold)
-			dfso_upthreshold = data->upthreshold;
-		if (data->downdifferential)
-			dfso_downdifferential = data->downdifferential;
-	}
+	if (df->profile->up_threshold)
+		dfso_upthreshold = df->profile->up_threshold;
+	if (df->profile->down_differential)
+		dfso_downdifferential = df->profile->down_differential;
+
 	if (dfso_upthreshold > 100 ||
 	    dfso_upthreshold < dfso_downdifferential)
 		return -EINVAL;
@@ -118,7 +113,9 @@ static int devfreq_simple_ondemand_handler(struct devfreq *devfreq,
 static struct devfreq_governor devfreq_simple_ondemand = {
 	.name = DEVFREQ_GOV_SIMPLE_ONDEMAND,
 	.attrs = DEVFREQ_GOV_ATTR_POLLING_INTERVAL
-		| DEVFREQ_GOV_ATTR_TIMER,
+		| DEVFREQ_GOV_ATTR_TIMER
+		| DEVFREQ_GOV_ATTR_UP_THRESHOLD
+		| DEVFREQ_GOV_ATTR_DOWN_DIFF,
 	.get_target_freq = devfreq_simple_ondemand_func,
 	.event_handler = devfreq_simple_ondemand_handler,
 };

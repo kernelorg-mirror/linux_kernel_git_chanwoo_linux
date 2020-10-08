@@ -43,9 +43,19 @@
  *   : Indicate polling_interval sysfs attribute
  * - DEVFREQ_GOV_ATTR_TIMER
  *   : Indicate timer sysfs attribute
+ * - DEVFREQ_GOV_ATTR_UP_THRESHOLD
+ *   : Indicate up_threshold sysfs attribute
+ * - DEVFREQ_GOV_ATTR_DOWN_DIFF
+ *   : Indicate down_differential sysfs attribute
  */
 #define DEVFREQ_GOV_ATTR_POLLING_INTERVAL		BIT(0)
 #define DEVFREQ_GOV_ATTR_TIMER				BIT(1)
+#define DEVFREQ_GOV_ATTR_UP_THRESHOLD			BIT(2)
+#define DEVFREQ_GOV_ATTR_DOWN_DIFF			BIT(3)
+
+/* Default constants for DevFreq-Simple-Ondemand (DFSO) */
+#define DEVFREQ_UP_THRESHOLD				(90)
+#define DEVFREQ_DOWN_DIFFERENCTIAL			(5)
 
 /**
  * struct devfreq_governor - Devfreq policy governor

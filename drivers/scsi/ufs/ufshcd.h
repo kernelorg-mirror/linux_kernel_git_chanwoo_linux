@@ -640,7 +640,6 @@ enum ufshcd_caps {
 
 struct ufs_hba_variant_params {
 	struct devfreq_dev_profile devfreq_profile;
-	struct devfreq_simple_ondemand_data ondemand_data;
 	u16 hba_enable_delay_us;
 	u32 wb_flush_threshold;
 };

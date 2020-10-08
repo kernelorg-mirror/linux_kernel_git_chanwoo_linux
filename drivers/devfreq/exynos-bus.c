@@ -295,26 +295,20 @@ static int exynos_bus_profile_init(struct exynos_bus *bus,
 				   struct devfreq_dev_profile *profile)
 {
 	struct device *dev = bus->dev;
-	struct devfreq_simple_ondemand_data *ondemand_data;
 	int ret;
 
 	/* Initialize the struct profile and governor data for parent device */
 	profile->polling_ms = 50;
+	profile->up_threshold = 40;
+	profile->down_differential = 5;
 	profile->target = exynos_bus_target;
 	profile->get_dev_status = exynos_bus_get_dev_status;
 	profile->exit = exynos_bus_exit;
 
-	ondemand_data = devm_kzalloc(dev, sizeof(*ondemand_data), GFP_KERNEL);
-	if (!ondemand_data)
-		return -ENOMEM;
-
-	ondemand_data->upthreshold = 40;
-	ondemand_data->downdifferential = 5;
-
 	/* Add devfreq device to monitor and handle the exynos bus */
 	bus->devfreq = devm_devfreq_add_device(dev, profile,
 						DEVFREQ_GOV_SIMPLE_ONDEMAND,
-						ondemand_data);
+						NULL);
 	if (IS_ERR(bus->devfreq)) {
 		dev_err(dev, "failed to add devfreq device\n");
 		return PTR_ERR(bus->devfreq);

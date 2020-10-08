@@ -1843,6 +1843,109 @@ out:
 }
 static DEVICE_ATTR_RW(timer);
 
+static ssize_t up_threshold_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct devfreq *df = to_devfreq(dev);
+
+	if (!df->profile)
+		return -EINVAL;
+
+	return sprintf(buf, "%d\n", df->profile->up_threshold
+					? df->profile->up_threshold
+					: DEVFREQ_UP_THRESHOLD);
+}
+
+static ssize_t up_threshold_store(struct device *dev,
+				 struct device_attribute *attr,
+				 const char *buf, size_t count)
+{
+	struct devfreq *df = to_devfreq(dev);
+	unsigned int value, down_differential;
+	int ret = 0;
+
+	if (df->stop_polling)
+		return 0;
+
+	if (!df->profile)
+		return -EINVAL;
+
+	ret = sscanf(buf, "%u", &value);
+	if (ret != 1)
+		return -EINVAL;
+
+	if (value > 100)
+		value = 100;
+
+	down_differential = df->profile->down_differential
+				? df->profile->down_differential
+				: DEVFREQ_DOWN_DIFFERENCTIAL;
+	if (value < down_differential)
+		value = down_differential;
+
+	mutex_lock(&df->lock);
+	df->profile->up_threshold = value;
+	ret = update_devfreq(df);
+	mutex_unlock(&df->lock);
+
+	if (ret)
+		dev_err(df->dev.parent,
+			"failed to update frequency from PM QoS (%d)\n", ret);
+	ret = count;
+	return ret;
+}
+static DEVICE_ATTR_RW(up_threshold);
+
+static ssize_t down_differential_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct devfreq *df = to_devfreq(dev);
+
+	if (!df->profile)
+		return -EINVAL;
+
+	return sprintf(buf, "%d\n", df->profile->down_differential
+					? df->profile->down_differential
+					: DEVFREQ_DOWN_DIFFERENCTIAL);
+}
+
+static ssize_t down_differential_store(struct device *dev,
+				 struct device_attribute *attr,
+				 const char *buf, size_t count)
+{
+	struct devfreq *df = to_devfreq(dev);
+	unsigned int value, up_threshold;
+	int ret = 0;
+
+	if (df->stop_polling)
+		return 0;
+
+	if (!df->profile)
+		return -EINVAL;
+
+	ret = sscanf(buf, "%u", &value);
+	if (ret != 1)
+		return -EINVAL;
+
+	up_threshold = df->profile->up_threshold
+				? df->profile->up_threshold
+				: DEVFREQ_UP_THRESHOLD;
+	if (value > up_threshold)
+		value = up_threshold;
+
+	mutex_lock(&df->lock);
+	df->profile->down_differential = value;
+	ret = update_devfreq(df);
+	mutex_unlock(&df->lock);
+
+	if (ret)
+		dev_err(df->dev.parent,
+			"failed to update frequency from PM QoS (%d)\n", ret);
+	ret = count;
+	return ret;
+}
+static DEVICE_ATTR_RW(down_differential);
+
 #define CREATE_SYSFS_FILE(df, name)					\
 {									\
 	int ret;							\
@@ -1861,6 +1964,10 @@ static void create_sysfs_files(struct devfreq *devfreq,
 		CREATE_SYSFS_FILE(devfreq, polling_interval);
 	if (IS_SUPPORTED_ATTR(gov->attrs, TIMER))
 		CREATE_SYSFS_FILE(devfreq, timer);
+	if (IS_SUPPORTED_ATTR(gov->attrs, UP_THRESHOLD))
+		CREATE_SYSFS_FILE(devfreq, up_threshold);
+	if (IS_SUPPORTED_ATTR(gov->attrs, DOWN_DIFF))
+		CREATE_SYSFS_FILE(devfreq, down_differential);
 }
 
 /* Remove the specific sysfs files which depend on each governor. */
@@ -1872,6 +1979,12 @@ static void remove_sysfs_files(struct devfreq *devfreq,
 				&dev_attr_polling_interval.attr);
 	if (IS_SUPPORTED_ATTR(gov->attrs, TIMER))
 		sysfs_remove_file(&devfreq->dev.kobj, &dev_attr_timer.attr);
+	if (IS_SUPPORTED_ATTR(gov->attrs, UP_THRESHOLD))
+		sysfs_remove_file(&devfreq->dev.kobj,
+				&dev_attr_up_threshold.attr);
+	if (IS_SUPPORTED_ATTR(gov->attrs, DOWN_DIFF))
+		sysfs_remove_file(&devfreq->dev.kobj,
+				&dev_attr_down_differential.attr);
 }
 
 /**
@@ -1891,22 +2004,28 @@ static int devfreq_summary_show(struct seq_file *s, void *data)
 	unsigned long cur_freq, min_freq, max_freq;
 	unsigned int polling_ms;
 	unsigned int timer;
+	unsigned int up_threshold;
+	unsigned int down_differential;
 
-	seq_printf(s, "%-30s %-30s %-15s %-10s %10s %12s %12s %12s\n",
+	seq_printf(s, "%-30s %-30s %-15s %-10s %10s %8s %9s %12s %12s %12s\n",
 			"dev",
 			"parent_dev",
 			"governor",
 			"timer",
 			"polling_ms",
+			"up_thres",
+			"down_diff",
 			"cur_freq_Hz",
 			"min_freq_Hz",
 			"max_freq_Hz");
-	seq_printf(s, "%30s %30s %15s %10s %10s %12s %12s %12s\n",
+	seq_printf(s, "%30s %30s %15s %10s %10s %8s %9s %12s %12s %12s\n",
 			"------------------------------",
 			"------------------------------",
 			"---------------",
 			"----------",
 			"----------",
+			"--------",
+			"---------",
 			"------------",
 			"------------",
 			"------------");
@@ -1935,15 +2054,31 @@ static int devfreq_summary_show(struct seq_file *s, void *data)
 			polling_ms = devfreq->profile->polling_ms;
 		else
 			polling_ms = 0;
+
+		if (IS_SUPPORTED_ATTR(devfreq->governor->attrs, UP_THRESHOLD))
+			up_threshold = devfreq->profile->up_threshold
+					? devfreq->profile->up_threshold
+					: DEVFREQ_UP_THRESHOLD;
+		else
+			up_threshold = 0;
+
+		if (IS_SUPPORTED_ATTR(devfreq->governor->attrs, DOWN_DIFF))
+			down_differential = devfreq->profile->down_differential
+					? devfreq->profile->down_differential
+					: DEVFREQ_DOWN_DIFFERENCTIAL;
+		else
+			down_differential = 0;
 		mutex_unlock(&devfreq->lock);
 
 		seq_printf(s,
-			"%-30s %-30s %-15s %-10s %10d %12ld %12ld %12ld\n",
+			"%-30s %-30s %-15s %-10s %10d %8d %9d %12ld %12ld %12ld\n",
 			dev_name(&devfreq->dev),
 			p_devfreq ? dev_name(&p_devfreq->dev) : "null",
 			devfreq->governor->name,
 			polling_ms ? timer_name[timer] : "null",
 			polling_ms,
+			up_threshold,
+			down_differential,
 			cur_freq,
 			min_freq,
 			max_freq);

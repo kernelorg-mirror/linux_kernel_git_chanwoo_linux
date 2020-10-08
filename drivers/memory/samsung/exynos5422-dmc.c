@@ -152,7 +152,6 @@ struct dmc_opp_table {
 struct exynos5_dmc {
 	struct device *dev;
 	struct devfreq *df;
-	struct devfreq_simple_ondemand_data gov_data;
 	void __iomem *base_drexi0;
 	void __iomem *base_drexi1;
 	struct regmap *clk_regmap;
@@ -1493,8 +1492,8 @@ static int exynos5_dmc_probe(struct platform_device *pdev)
 		 * Setup default thresholds for the devfreq governor.
 		 * The values are chosen based on experiments.
 		 */
-		dmc->gov_data.upthreshold = 55;
-		dmc->gov_data.downdifferential = 5;
+		exynos5_dmc_df_profile.up_threshold = 55;
+		exynos5_dmc_df_profile.down_differential = 5;
 
 		exynos5_dmc_enable_perf_events(dmc);
 
@@ -1510,15 +1509,14 @@ static int exynos5_dmc_probe(struct platform_device *pdev)
 		 * Setup default thresholds for the devfreq governor.
 		 * The values are chosen based on experiments.
 		 */
-		dmc->gov_data.upthreshold = 10;
-		dmc->gov_data.downdifferential = 5;
-
+		exynos5_dmc_df_profile.up_threshold = 10;
+		exynos5_dmc_df_profile.down_differential = 5;
 		exynos5_dmc_df_profile.polling_ms = 100;
 	}
 
 	dmc->df = devm_devfreq_add_device(dev, &exynos5_dmc_df_profile,
 					  DEVFREQ_GOV_SIMPLE_ONDEMAND,
-					  &dmc->gov_data);
+					  NULL);
 
 	if (IS_ERR(dmc->df)) {
 		ret = PTR_ERR(dmc->df);

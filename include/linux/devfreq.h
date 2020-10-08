@@ -102,12 +102,26 @@ struct devfreq_dev_status {
  *
  * @is_cooling_device: A self-explanatory boolean giving the device a
  *                     cooling effect property.
+ * @up_threshold:	If the load is over this value, the frequency jumps.
+ *			Specify 0 to use the default. Valid value = 0 to 100.
+ * @down_differential:	If the load is under upthreshold - downdifferential,
+ *			the governor may consider slowing the frequency down.
+ *			Specify 0 to use the default. Valid value = 0 to 100.
+ *			downdifferential < upthreshold must hold.
  */
 struct devfreq_dev_profile {
 	unsigned long initial_freq;
 	unsigned int polling_ms;
 	enum devfreq_timer timer;
 	bool is_cooling_device;
+ * @up_threshold:	If the load is over this value, the frequency jumps.
+ *			Specify 0 to use the default. Valid value = 0 to 100.
+ * @down_differential:	If the load is under upthreshold - downdifferential,
+ *			the governor may consider slowing the frequency down.
+ *			Specify 0 to use the default. Valid value = 0 to 100.
+ *			downdifferential < upthreshold must hold.
+	unsigned int up_threshold;
+	unsigned int down_differential;
 
 	int (*target)(struct device *dev, unsigned long *freq, u32 flags);
 	int (*get_dev_status)(struct device *dev,
@@ -266,26 +280,6 @@ void devm_devfreq_unregister_notifier(struct device *dev,
 struct devfreq *devfreq_get_devfreq_by_node(struct device_node *node);
 struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev,
 				const char *phandle_name, int index);
-
-#if IS_ENABLED(CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND)
-/**
- * struct devfreq_simple_ondemand_data - ``void *data`` fed to struct devfreq
- *	and devfreq_add_device
- * @upthreshold:	If the load is over this value, the frequency jumps.
- *			Specify 0 to use the default. Valid value = 0 to 100.
- * @downdifferential:	If the load is under upthreshold - downdifferential,
- *			the governor may consider slowing the frequency down.
- *			Specify 0 to use the default. Valid value = 0 to 100.
- *			downdifferential < upthreshold must hold.
- *
- * If the fed devfreq_simple_ondemand_data pointer is NULL to the governor,
- * the governor uses the default values.
- */
-struct devfreq_simple_ondemand_data {
-	unsigned int upthreshold;
-	unsigned int downdifferential;
-};
-#endif
 
 #if IS_ENABLED(CONFIG_DEVFREQ_GOV_PASSIVE)
 /**
