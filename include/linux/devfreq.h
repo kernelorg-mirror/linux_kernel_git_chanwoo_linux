@@ -144,6 +144,11 @@ struct devfreq_stats {
  * @node:	list node - contains the devices with devfreq that have been
  *		registered.
  * @lock:	a mutex to protect accessing devfreq.
+ * @governor_lock:	a mutex to serialize governor switching (STOP,
+ *		@governor update and START) against DEVFREQ_GOV_SUSPEND and
+ *		DEVFREQ_GOV_RESUME dispatch. Lock order: devfreq_list_lock ->
+ *		@governor_lock -> @lock. It must not be taken while holding
+ *		@lock.
  * @dev:	device registered by devfreq class. dev.parent is the device
  *		using devfreq.
  * @profile:	device-specific devfreq profile
@@ -185,6 +190,7 @@ struct devfreq {
 	struct list_head node;
 
 	struct mutex lock;
+	struct mutex governor_lock;	/* see kernel-doc above */
 	struct device dev;
 	struct devfreq_dev_profile *profile;
 	const struct devfreq_governor *governor;

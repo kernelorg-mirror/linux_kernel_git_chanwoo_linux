@@ -779,6 +779,7 @@ static void devfreq_dev_release(struct device *dev)
 	if (devfreq->opp_table)
 		dev_pm_opp_put_opp_table(devfreq->opp_table);
 
+	mutex_destroy(&devfreq->governor_lock);
 	mutex_destroy(&devfreq->lock);
 	srcu_cleanup_notifier_head(&devfreq->transition_notifier_list);
 	kfree(devfreq);
@@ -822,6 +823,7 @@ struct devfreq *devfreq_add_device(struct device *dev,
 	}
 
 	mutex_init(&devfreq->lock);
+	mutex_init(&devfreq->governor_lock);
 	mutex_lock(&devfreq->lock);
 	devfreq->dev.parent = dev;
 	devfreq->dev.class = devfreq_class;
@@ -940,9 +942,11 @@ struct devfreq *devfreq_add_device(struct device *dev,
 		goto err_init;
 	}
 
+	mutex_lock(&devfreq->governor_lock);
 	devfreq->governor = governor;
 	err = devfreq->governor->event_handler(devfreq, DEVFREQ_GOV_START,
 						NULL);
+	mutex_unlock(&devfreq->governor_lock);
 	if (err) {
 		dev_err_probe(dev, err,
 			"%s: Unable to start governor for the device\n",
@@ -991,9 +995,14 @@ int devfreq_remove_device(struct devfreq *devfreq)
 
 	devfreq_cooling_unregister(devfreq->cdev);
 
-	if (devfreq->governor)
+	mutex_lock(&devfreq->governor_lock);
+	if (devfreq->governor) {
 		devfreq->governor->event_handler(devfreq,
 						 DEVFREQ_GOV_STOP, NULL);
+		/* Prevent a later suspend/resume from reaching the governor */
+		devfreq->governor = NULL;
+	}
+	mutex_unlock(&devfreq->governor_lock);
 	device_unregister(&devfreq->dev);
 
 	return 0;
@@ -1152,12 +1161,16 @@ int devfreq_suspend_device(struct devfreq *devfreq)
 	if (atomic_inc_return(&devfreq->suspend_count) > 1)
 		return 0;
 
+	mutex_lock(&devfreq->governor_lock);
 	if (devfreq->governor) {
 		ret = devfreq->governor->event_handler(devfreq,
 					DEVFREQ_GOV_SUSPEND, NULL);
-		if (ret)
+		if (ret) {
+			mutex_unlock(&devfreq->governor_lock);
 			return ret;
+		}
 	}
+	mutex_unlock(&devfreq->governor_lock);
 
 	if (devfreq->suspend_freq) {
 		mutex_lock(&devfreq->lock);
@@ -1197,12 +1210,16 @@ int devfreq_resume_device(struct devfreq *devfreq)
 			return ret;
 	}
 
+	mutex_lock(&devfreq->governor_lock);
 	if (devfreq->governor) {
 		ret = devfreq->governor->event_handler(devfreq,
 					DEVFREQ_GOV_RESUME, NULL);
-		if (ret)
+		if (ret) {
+			mutex_unlock(&devfreq->governor_lock);
 			return ret;
+		}
 	}
+	mutex_unlock(&devfreq->governor_lock);
 
 	return 0;
 }
@@ -1337,10 +1354,9 @@ int devfreq_remove_governor(struct devfreq_governor *governor)
 		int ret;
 		struct device *dev = devfreq->dev.parent;
 
-		if (!devfreq->governor)
-			continue;
-
-		if (!strncmp(devfreq->governor->name, governor->name,
+		mutex_lock(&devfreq->governor_lock);
+		if (devfreq->governor &&
+		    !strncmp(devfreq->governor->name, governor->name,
 			     DEVFREQ_NAME_LEN)) {
 			ret = devfreq->governor->event_handler(devfreq,
 						DEVFREQ_GOV_STOP, NULL);
@@ -1351,6 +1367,7 @@ int devfreq_remove_governor(struct devfreq_governor *governor)
 			}
 			devfreq->governor = NULL;
 		}
+		mutex_unlock(&devfreq->governor_lock);
 	}
 
 	list_del(&governor->node);
@@ -1398,16 +1415,18 @@ static ssize_t governor_store(struct device *dev, struct device_attribute *attr,
 		ret = PTR_ERR(governor);
 		goto out;
 	}
+
+	mutex_lock(&df->governor_lock);
 	if (!df->governor)
 		goto start_new_governor;
 
 	if (df->governor == governor) {
 		ret = 0;
-		goto out;
+		goto out_unlock;
 	} else if (IS_SUPPORTED_FLAG(df->governor->flags, IMMUTABLE)
 		|| IS_SUPPORTED_FLAG(governor->flags, IMMUTABLE)) {
 		ret = -EINVAL;
-		goto out;
+		goto out_unlock;
 	}
 
 	/*
@@ -1418,7 +1437,7 @@ static ssize_t governor_store(struct device *dev, struct device_attribute *attr,
 	if (ret) {
 		dev_warn(dev, "%s: Governor %s not stopped(%d)\n",
 			 __func__, df->governor->name, ret);
-		goto out;
+		goto out_unlock;
 	}
 
 start_new_governor:
@@ -1436,7 +1455,7 @@ start_new_governor:
 		/* Restore previous governor */
 		df->governor = prev_governor;
 		if (!df->governor)
-			goto out;
+			goto out_unlock;
 
 		ret = df->governor->event_handler(df, DEVFREQ_GOV_START, NULL);
 		if (ret) {
@@ -1444,7 +1463,7 @@ start_new_governor:
 				"%s: reverting to Governor %s failed (%d)\n",
 				__func__, prev_governor->name, ret);
 			df->governor = NULL;
-			goto out;
+			goto out_unlock;
 		}
 	}
 
@@ -1454,6 +1473,8 @@ start_new_governor:
 	 */
 	ret = sysfs_update_group(&df->dev.kobj, &gov_attr_group);
 
+out_unlock:
+	mutex_unlock(&df->governor_lock);
 out:
 	mutex_unlock(&devfreq_list_lock);
 
@@ -1831,6 +1852,7 @@ static ssize_t timer_store(struct device *dev, struct device_attribute *attr,
 	int ret = 0, i;
 
 	guard(mutex)(&devfreq_list_lock);
+	guard(mutex)(&df->governor_lock);
 
 	if (!df->governor || !df->profile ||
 	    !IS_SUPPORTED_ATTR(df->governor->attrs, TIMER))
